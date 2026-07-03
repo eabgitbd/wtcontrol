@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Balance - Diet & Weight Tracker</title>
+
+  <!-- PWA / Installability -->
+  <meta name="description" content="Balance - a simple diet, water and weight tracker.">
+  <meta name="theme-color" content="#007aff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Balance">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <style>
+    /* =====================================================================
+       DESIGN TOKENS & LIQUID GLASS THEME
+       ===================================================================== */
+    :root {
+      /* Light Mode Palette */
+      --bg-gradient: radial-gradient(circle at 10% 10%, #fdfbfb 0%, #ebedee 100%);
+      --glass-bg: rgba(255, 255, 255, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.8);
+      --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+      
+      --text-main: #1d1d1f;
+      --text-muted: #86868b;
+      --card-radius: 28px;
+      
+      --accent-red: #ff3b30;
+      --accent-green: #34c759;
+      --accent-blue: #007aff;
+      --accent-orange: #ff9500;
+      
+      --input-bg: rgba(255, 255, 255, 0.8);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        /* Dark Mode Palette */
+        --bg-gradient: radial-gradient(circle at 10% 10%, #1c1c1e 0%, #000000 100%);
+        --glass-bg: rgba(30, 30, 32, 0.65);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+        
+        --text-main: #f5f5f7;
+        --text-muted: #a1a1a6;
+        --input-bg: rgba(0, 0, 0, 0.4);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 100px; /* Space for tab bar */
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: background 0.3s ease;
+    }
+
+    /* Typography */
+    h1, h2, h3 { font-weight: 700; letter-spacing: -0.5px; }
+    h1 { font-size: 34px; margin-bottom: 24px; }
+    h2 { font-size: 22px; margin-bottom: 16px; }
+    p { margin-bottom: 16px; color: var(--text-muted); }
+
+    /* Layout & Glass Cards */
+    .container {
+      width: 100%;
+      max-width: 600px;
+      padding: 24px;
+    }
+
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--card-radius);
+      box-shadow: var(--glass-shadow);
+      padding: 24px;
+      margin-bottom: 24px;
+      transition: transform 0.2s ease, opacity 0.3s ease;
+    }
+
+    /* Screen Management */
+    .screen {
+      display: none;
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .screen.active { display: block; }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Inputs & Buttons */
+    input, select, button {
+      width: 100%;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--glass-border);
+      background: var(--input-bg);
+      color: var(--text-main);
+      font-size: 16px;
+      outline: none;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+    }
+
+    button {
+      background: var(--accent-blue);
+      color: #fff;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 14px 0 rgba(0, 122, 255, 0.39);
+    }
+    button:active { transform: scale(0.97); }
+    button.secondary {
+      background: rgba(0,0,0,0.05);
+      color: var(--accent-blue);
+      box-shadow: none;
+    }
+    @media (prefers-color-scheme: dark) {
+      button.secondary { background: rgba(255,255,255,0.1); }
+    }
+    button.danger { background: var(--accent-red); box-shadow: 0 4px 14px 0 rgba(255, 59, 48, 0.39); }
+
+    /* Onboarding Grid */
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* Progress Rings (Today Screen) */
+    .ring-container {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 32px;
+    }
+    .ring-container svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+    }
+    .ring-bg { fill: none; stroke: var(--glass-border); stroke-width: 16; }
+    .ring-fill {
+      fill: none;
+      stroke: var(--accent-red);
+      stroke-width: 16;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ring-text {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .ring-text h2 { margin: 0; font-size: 42px; line-height: 1; }
+    .ring-text p { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* Macro Bars */
+    .macro-bar-container { margin-bottom: 20px; }
+    .macro-header { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 8px;}
+    .macro-track {
+      height: 12px;
+      background: var(--input-bg);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--glass-border);
+    }
+    .macro-fill {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Log List & Search */
+    .search-result, .log-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: var(--glass-bg);
+      border-bottom: 1px solid var(--glass-border);
+      cursor: pointer;
+    }
+    .search-result:last-child { border-bottom: none; }
+    .search-result:hover { background: rgba(0, 122, 255, 0.05); }
+    .food-name { font-weight: 600; font-size: 16px; }
+    .food-meta { font-size: 13px; color: var(--text-muted); }
+    
+    .delete-btn {
+      background: none; box-shadow: none; color: var(--accent-red); padding: 8px; width: auto; font-size: 20px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(5px);
+      display: none; justify-content: center; align-items: center; z-index: 100;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .modal-overlay.active { display: flex; opacity: 1; }
+    .modal { width: 90%; max-width: 400px; margin-bottom: 0; }
+
+    /* Cloud Status */
+    .cloud-status {
+      font-size: 12px; color: var(--text-muted); margin-top: 8px; text-align: center;
+    }
+
+    /* Water Grid */
+    .water-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 24px;
+    }
+    .water-glass-btn {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      height: 80px;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      transition: transform 0.1s;
+    }
+    .water-glass-btn:active { transform: scale(0.92); }
+    .water-fill {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(180deg, #64d2ff 0%, #007aff 100%);
+      height: 0%;
+      transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity: 0.8;
+    }
+    .water-icon {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      opacity: 0.5;
+    }
+
+    /* Progress Chart */
+    canvas { width: 100%; height: 250px; background: transparent; }
+    
+    /* Profile row */
+    .profile-row {
+      display: flex; justify-content: space-between;
+      padding: 16px 0; border-bottom: 1px solid var(--glass-border);
+    }
+    .profile-row:last-child { border-bottom: none; }
+
+    /* Bottom Tab Bar */
+    .tab-bar {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 48px);
+      max-width: 500px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--glass-border);
+      border-radius: 36px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-around;
+      padding: 12px;
+      z-index: 50;
+      display: none; /* hidden during onboarding */
+    }
+    .tab-item {
+      display: flex; flex-direction: column; align-items: center;
+      color: var(--text-muted); cursor: pointer; padding: 8px 16px;
+      border-radius: 20px; transition: all 0.2s;
+    }
+    .tab-item svg { width: 24px; height: 24px; margin-bottom: 4px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;}
+    .tab-item span { font-size: 11px; font-weight: 600; }
+    .tab-item.active { color: var(--accent-blue); background: rgba(0, 122, 255, 0.1); }
+  </style>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div id="onboarding" class="container screen active">
+  <div class="glass-card" style="margin-top: 40px;">
+    <h1>Welcome to Balance</h1>
+    <p>Let's personalize your metabolic plan based on your unique profile.</p>
+    
+    <div class="input-grid">
+      <div>
+        <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Age</label>
+        <input type="number" id="ob-age" placeholder="e.g. 30" required>
+      </div>
+      <div>
+         <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Gender</label>
+         <select id="ob-gender">
+           <option value="female">Female</option>
+           <option value="male">Male</option>
+         </select>
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Height (cm)</label>
+        <input type="number" id="ob-height" placeholder="e.g. 170" required>
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Weight (kg)</label>
+        <input type="number" id="ob-weight" placeholder="e.g. 75" required>
+      </div>
+    </div>
+    
+    <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Target Weight (kg)</label>
+    <input type="number" id="ob-target-weight" placeholder="e.g. 65" required>
+    
+    <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Goal Duration (weeks)</label>
+    <input type="number" id="ob-weeks" placeholder="e.g. 12" required>
+    
+    <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Activity Level</label>
+    <select id="ob-activity">
+      <option value="1.2">Sedentary (Little/no exercise)</option>
+      <option value="1.375">Light (Exercise 1-3 days/wk)</option>
+      <option value="1.55">Moderate (Exercise 3-5 days/wk)</option>
+      <option value="1.725">Active (Exercise 6-7 days/wk)</option>
+      <option value="1.9">Very Active (Physical job / Hard exercise)</option>
+    </select>
+    
+    <button onclick="generatePlan()" style="margin-top: 16px;">Create My Plan</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="container" style="display: none;">
+  
+  <!-- TODAY SCREEN -->
+  <div id="screen-today" class="screen">
+    <div class="glass-card" style="text-align: center;">
+      <h2 style="text-align: left;">Today's Overview</h2>
+      
+      <div class="ring-container">
+        <svg viewBox="0 0 200 200">
+          <circle class="ring-bg" cx="100" cy="100" r="80"></circle>
+          <circle id="cal-ring" class="ring-fill" cx="100" cy="100" r="80" stroke-dasharray="502.65" stroke-dashoffset="502.65"></circle>
+        </svg>
+        <div class="ring-text">
+          <h2 id="cal-remaining">0</h2>
+          <p>Kcal Left</p>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content: space-between; margin-bottom: 24px;">
+        <div style="flex:1; text-align:center;">
+          <p style="margin:0; font-size:12px;">Eaten</p>
+          <h3 id="cal-eaten">0</h3>
+        </div>
+        <div style="flex:1; text-align:center;">
+          <p style="margin:0; font-size:12px;">Budget</p>
+          <h3 id="cal-budget">0</h3>
+        </div>
+      </div>
+
+      <div class="macro-bar-container">
+        <div class="macro-header">
+          <span style="color: var(--accent-green)">Protein</span>
+          <span id="txt-protein">0 / 0g</span>
+        </div>
+        <div class="macro-track"><div id="bar-protein" class="macro-fill" style="width: 0%; background: var(--accent-green)"></div></div>
+      </div>
+      <div class="macro-bar-container">
+        <div class="macro-header">
+          <span style="color: var(--accent-orange)">Fat</span>
+          <span id="txt-fat">0 / 0g</span>
+        </div>
+        <div class="macro-track"><div id="bar-fat" class="macro-fill" style="width: 0%; background: var(--accent-orange)"></div></div>
+      </div>
+      <div class="macro-bar-container">
+        <div class="macro-header">
+          <span style="color: var(--accent-blue)">Carbs</span>
+          <span id="txt-carbs">0 / 0g</span>
+        </div>
+        <div class="macro-track"><div id="bar-carbs" class="macro-fill" style="width: 0%; background: var(--accent-blue)"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG SCREEN -->
+  <div id="screen-log" class="screen">
+    <div class="glass-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="margin: 0;">Log Food</h2>
+        <button class="secondary" style="width: auto; padding: 8px 16px; margin: 0; font-size: 14px;" onclick="openCustomFoodModal()">+ Custom Food</button>
+      </div>
+      <input type="text" id="foodSearch" placeholder="Search database (e.g. apple, cheese)..." onkeyup="searchFood()">
+      <div id="searchResults" style="max-height: 200px; overflow-y: auto; border-radius: 16px;"></div>
+    </div>
+
+    <div class="glass-card">
+      <h2>Today's Log</h2>
+      <div id="diaryList">
+        <!-- Logged items inject here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- WATER SCREEN -->
+  <div id="screen-water" class="screen">
+    <div class="glass-card">
+      <h2>Hydration Tracker</h2>
+      <p>Tap a glass to log 250ml of water. Goal: 2000ml.</p>
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <h1 style="font-size: 48px; margin: 0; color: var(--accent-blue);" id="water-total">0<span style="font-size:24px;">ml</span></h1>
+      </div>
+
+      <div class="water-grid" id="waterGrid">
+        <!-- Glasses generated by JS -->
+      </div>
+      
+      <div style="margin-top: 32px; display: flex; gap: 12px;">
+         <button class="secondary" onclick="addWater(-250)">- Remove</button>
+         <button onclick="addWater(250)">+ Add 250ml</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESS SCREEN -->
+  <div id="screen-progress" class="screen">
+    <div class="glass-card">
+      <h2>Goal Tracking</h2>
+      <div style="display: flex; justify-content: space-between; text-align: center; margin-top: 16px;">
+        <div style="flex:1;">
+          <p style="margin:0; font-size:12px; color:var(--text-muted);">Current</p>
+          <h3 id="trk-current" style="color:var(--accent-blue);">-- kg</h3>
+        </div>
+        <div style="flex:1;">
+          <p style="margin:0; font-size:12px; color:var(--text-muted);">Target</p>
+          <h3 id="trk-target">-- kg</h3>
+        </div>
+        <div style="flex:1;">
+          <p style="margin:0; font-size:12px; color:var(--text-muted);">Days Left</p>
+          <h3 id="trk-days" style="color:var(--accent-orange);">--</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <h2>Weight Trajectory</h2>
+      <canvas id="weightChart"></canvas>
+    </div>
+    
+    <div class="glass-card">
+      <h2>Update Weight</h2>
+      <div style="display: flex; gap: 12px;">
+        <input type="number" id="newWeight" placeholder="Current weight (kg)" step="0.1">
+        <button onclick="logWeight()" style="width: auto; padding: 0 32px;">Save</button>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <h2>This Week's Averages</h2>
+      <div class="profile-row"><span>Calories Eaten</span><span id="avg-cal" style="font-weight:600;">--</span></div>
+      <div class="profile-row"><span>Daily Deficit</span><span id="avg-def" style="font-weight:600; color:var(--accent-green);">--</span></div>
+    </div>
+  </div>
+
+  <!-- PROFILE SCREEN -->
+  <div id="screen-profile" class="screen">
+    <div class="glass-card">
+      <h2>My Metabolic Plan</h2>
+      <div id="profileSummary"></div>
+    </div>
+
+    <div class="glass-card" style="text-align: center;">
+      <h2>Google Account Sync</h2>
+      <p style="font-size: 13px;">Sign in with Google to back up and restore your data to your own private Google Drive (App Data folder — not visible in your regular Drive files).</p>
+
+      <div id="google-signed-out">
+        <div id="gis-signin-btn" style="display:flex; justify-content:center; margin: 12px 0;"></div>
+      </div>
+
+      <div id="google-signed-in" style="display:none;">
+        <div style="display: flex; gap: 12px; margin-top: 16px;">
+          <button onclick="backupData()">Backup to Drive</button>
+          <button class="secondary" onclick="restoreData()">Restore from Drive</button>
+        </div>
+        <button class="secondary" onclick="googleSignOut()" style="margin-top: 8px;">Sign Out</button>
+      </div>
+
+      <div id="cloud-status" class="cloud-status">Not signed in.</div>
+    </div>
+
+    <div class="glass-card" style="text-align: center;">
+      <h2>Local Backup</h2>
+      <p style="font-size: 13px;">Save or load a JSON backup file directly on this device — no account needed.</p>
+      <button class="secondary" onclick="exportData()">Backup to File (JSON)</button>
+      <button class="secondary" onclick="document.getElementById('restoreFileInput').click()">Restore from File</button>
+      <input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none" onchange="handleRestoreFile(event)">
+    </div>
+
+    <div class="glass-card" style="text-align: center;">
+      <h2>Settings</h2>
+      <button class="danger" onclick="resetApp()">Erase All Data & Start Over</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM TAB BAR -->
+<div id="tab-bar" class="tab-bar">
+  <div class="tab-item active" data-screen="today" onclick="navTo('today', this)">
+    <svg><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    <span>Today</span>
+  </div>
+  <div class="tab-item" data-screen="log" onclick="navTo('log', this)">
+    <svg><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    <span>Log</span>
+  </div>
+  <div class="tab-item" data-screen="water" onclick="navTo('water', this)">
+    <svg><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+    <span>Water</span>
+  </div>
+  <div class="tab-item" data-screen="progress" onclick="navTo('progress', this)">
+    <svg><path d="M3 3v18h18M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+    <span>Progress</span>
+  </div>
+  <div class="tab-item" data-screen="profile" onclick="navTo('profile', this)">
+    <svg><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>
+    <span>Profile</span>
+  </div>
+</div>
+
+<!-- ADD FOOD MODAL -->
+<div id="foodModal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+  <div class="glass-card modal">
+    <h2 id="modalFoodName">Food Name</h2>
+    <p id="modalFoodMeta">Calories & Macros per 100g</p>
+    
+    <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Amount Eaten</label>
+    <div style="display: flex; gap: 8px;">
+      <input type="number" id="modalAmount" value="100" oninput="updateDynamicPreview()">
+      <select id="modalUnit" style="width: 80px;" onchange="updateDynamicPreview()">
+        <option value="g">g</option>
+        <option value="ml">ml</option>
+      </select>
+    </div>
+    
+    <p id="modalDynamicPreview" style="font-size: 14px; color: var(--accent-blue); text-align: center; margin-top: 8px; font-weight: 600;"></p>
+    
+    <label style="font-size: 12px; color: var(--text-muted); margin-left: 12px;">Meal</label>
+    <select id="modalMeal">
+      <option>Breakfast</option>
+      <option>Lunch</option>
+      <option>Dinner</option>
+      <option>Snacks</option>
+    </select>
+    
+    <div style="display: flex; gap: 12px; margin-top: 16px;">
+      <button class="secondary" onclick="closeModal()">Cancel</button>
+      <button onclick="saveFoodEntry()">Log It</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOM FOOD MODAL -->
+<div id="customFoodModal" class="modal-overlay" onclick="if(event.target===this) closeCustomFoodModal()">
+  <div class="glass-card modal">
+    <h2>Add Custom Food</h2>
+    <p>Enter values per 100g or 100ml.</p>
+    
+    <input type="text" id="cf-name" placeholder="Food Name">
+    <div class="input-grid">
+      <input type="number" id="cf-cal" placeholder="Calories (kcal)">
+      <input type="number" id="cf-protein" placeholder="Protein (g)">
+      <input type="number" id="cf-fat" placeholder="Fat (g)">
+      <input type="number" id="cf-carbs" placeholder="Carbs (g)">
+    </div>
+    
+    <div style="display: flex; gap: 12px; margin-top: 16px;">
+      <button class="secondary" onclick="closeCustomFoodModal()">Cancel</button>
+      <button onclick="saveCustomFood()">Save Food</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYSTEM DIALOG MODAL -->
+<div id="systemDialogModal" class="modal-overlay" style="z-index: 9999;" onclick="if(event.target===this) closeDialog()">
+  <div class="glass-card modal" style="text-align: center;">
+    <h2 id="dialogTitle">Notice</h2>
+    <p id="dialogMessage" style="font-size: 15px; margin: 16px 0;"></p>
+    <div id="dialogButtons" style="display: flex; gap: 12px; margin-top: 24px;">
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   DATA & STATE MANAGEMENT
+   ===================================================================== */
+const STORAGE_PREFIX = "balance_wlt_";
+const STORAGE_KEYS = { plan: 'plan', diary: 'diary', water: 'water', weight: 'weight', customFoods: 'customFoods' };
+
+// Custom Dialog System (Bypasses iframe alert restrictions)
+window.showDialog = function(title, message, isConfirm = false, callback = null) {
+  document.getElementById('dialogTitle').innerText = title;
+  document.getElementById('dialogMessage').innerText = message;
+  const btns = document.getElementById('dialogButtons');
+  
+  if (isConfirm) {
+    btns.innerHTML = `
+      <button class="secondary" onclick="closeDialog()">Cancel</button>
+      <button class="danger" onclick="closeDialog(); window._dialogCallback();">Confirm</button>
+    `;
+  } else {
+    btns.innerHTML = `<button onclick="closeDialog(); if(window._dialogCallback) window._dialogCallback();">OK</button>`;
+  }
+  
+  window._dialogCallback = callback;
+  document.getElementById('systemDialogModal').classList.add('active');
+};
+window.closeDialog = function() {
+  document.getElementById('systemDialogModal').classList.remove('active');
+};
+
+let plan = null;
+let diary = [];
+let waterLog = {};
+let weightLogs = {};
+let customFoods = [];
+let foodDatabase = [];
+let selectedFoodForModal = null;
+
+// The Embedded Source of Truth Database. 
+const FALLBACK_FOOD_DB = [
+  { "name":"Cream Cheese", "calories":51, "fat_g":5.0, "saturated_fat_g":2.9, "carbs_g":0.8, "sugars_g":0.5, "protein_g":0.9, "fiber_g":0.0, "sodium_mg":0.016, "cholesterol_mg":14.6 },
+  { "name":"Neufchatel Cheese", "calories":215, "fat_g":19.4, "saturated_fat_g":10.9, "carbs_g":3.1, "sugars_g":2.7, "protein_g":7.8, "fiber_g":0.0, "sodium_mg":0.3, "cholesterol_mg":62.9 },
+  { "name":"Requeijao Cremoso Light Catupiry", "calories":49, "fat_g":3.6, "saturated_fat_g":2.3, "carbs_g":0.9, "sugars_g":3.4, "protein_g":0.8, "fiber_g":0.1, "sodium_mg":0.0, "cholesterol_mg":0.0 },
+  { "name":"Ricotta Cheese", "calories":174, "fat_g":13.0, "saturated_fat_g":8.3, "carbs_g":3.0, "sugars_g":0.3, "protein_g":11.3, "fiber_g":0.0, "sodium_mg":0.084, "cholesterol_mg":51.0 },
+  { "name":"Truffles", "calories":61, "fat_g":4.1, "saturated_fat_g":2.2, "carbs_g":5.4, "sugars_g":4.6, "protein_g":0.7, "fiber_g":0.3, "sodium_mg":0.034, "cholesterol_mg":6.4 },
+  { "name":"Jews Ear", "calories":25, "fat_g":0.095, "saturated_fat_g":0.0, "carbs_g":6.7, "sugars_g":0.0, "protein_g":0.5, "fiber_g":0.0, "sodium_mg":0.027, "cholesterol_mg":0.0 },
+  { "name":"Enoki Mushrooms", "calories":37, "fat_g":0.29, "saturated_fat_g":0.0, "carbs_g":7.8, "sugars_g":0.2, "protein_g":2.7, "fiber_g":2.7, "sodium_mg":0.003, "cholesterol_mg":0.0 },
+  
+  // A few extra common foods added so the app is instantly usable for testing
+  { "name":"Apple, Raw", "calories":52, "fat_g":0.2, "saturated_fat_g":0.0, "carbs_g":13.8, "sugars_g":10.4, "protein_g":0.3, "fiber_g":2.4, "sodium_mg":0.001, "cholesterol_mg":0.0 },
+  { "name":"Chicken Breast, Grilled", "calories":165, "fat_g":3.6, "saturated_fat_g":1.0, "carbs_g":0.0, "sugars_g":0.0, "protein_g":31.0, "fiber_g":0.0, "sodium_mg":0.074, "cholesterol_mg":85.0 },
+  { "name":"White Rice, Cooked", "calories":130, "fat_g":0.3, "saturated_fat_g":0.1, "carbs_g":28.2, "sugars_g":0.1, "protein_g":2.7, "fiber_g":0.4, "sodium_mg":0.001, "cholesterol_mg":0.0 },
+  { "name":"Broccoli, Boiled", "calories":35, "fat_g":0.4, "saturated_fat_g":0.1, "carbs_g":7.2, "sugars_g":1.4, "protein_g":2.4, "fiber_g":3.3, "sodium_mg":0.033, "cholesterol_mg":0.0 },
+  { "name":"Olive Oil", "calories":884, "fat_g":100.0, "saturated_fat_g":13.8, "carbs_g":0.0, "sugars_g":0.0, "protein_g":0.0, "fiber_g":0.0, "sodium_mg":0.002, "cholesterol_mg":0.0 },
+  { "name":"Egg, Hard Boiled", "calories":155, "fat_g":10.6, "saturated_fat_g":3.3, "carbs_g":1.1, "sugars_g":1.1, "protein_g":12.6, "fiber_g":0.0, "sodium_mg":0.124, "cholesterol_mg":373.0 },
+  
+  // Added Bangladeshi Foods from CSV
+  { "name":"Soybean oil (Soybean tel)", "calories":900, "fat_g":100.0, "saturated_fat_g":15.0, "carbs_g":0.0, "sugars_g":0.0, "protein_g":0.0, "fiber_g":0.0, "sodium_mg":0.0, "cholesterol_mg":0.0 },
+  { "name":"Rice flaked (Chira)", "calories":356, "fat_g":1.1, "saturated_fat_g":0.0, "carbs_g":79.2, "sugars_g":0.0, "protein_g":6.5, "fiber_g":1.3, "sodium_mg":2.0, "cholesterol_mg":0.0 },
+  { "name":"Rice flakes, white grain, watersoaked (Chira, veja)", "calories":105, "fat_g":0.3, "saturated_fat_g":0.0, "carbs_g":23.0, "sugars_g":0.0, "protein_g":2.0, "fiber_g":0.9, "sodium_mg":1.0, "cholesterol_mg":0.0 },
+  { "name":"Potato, Diamond, raw", "calories":66, "fat_g":0.2, "saturated_fat_g":0.0, "carbs_g":14.0, "sugars_g":0.0, "protein_g":1.2, "fiber_g":2.1, "sodium_mg":16.0, "cholesterol_mg":0.0 }
+];
+
+async function loadFoodDB() {
+  try {
+    // Attempt progressive enhancement load of full DB
+    const res = await fetch('food_database_lite.json');
+    if (!res.ok) throw new Error();
+    foodDatabase = await res.json();
+  } catch (err) {
+    console.log("Using embedded fallback database (Canvas/Offline mode).");
+    foodDatabase = FALLBACK_FOOD_DB;
+  }
+  
+  // Inject previously saved custom foods
+  customFoods = loadState(STORAGE_KEYS.customFoods, []);
+  foodDatabase = foodDatabase.concat(customFoods);
+}
+
+// Bug fix: user-entered custom food names were injected directly into
+// innerHTML with no escaping, which could break the layout (or worse) if a
+// name contained characters like < > " '. All dynamic text rendered via
+// innerHTML now goes through this helper.
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str ?? '');
+  return div.innerHTML;
+}
+
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function loadState(key, defaultVal) {
+  const val = localStorage.getItem(STORAGE_PREFIX + key);
+  return val ? JSON.parse(val) : defaultVal;
+}
+function saveState(key, val) {
+  localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(val));
+}
+
+/* =====================================================================
+   ONBOARDING & PLAN GENERATION
+   ===================================================================== */
+function generatePlan() {
+  const age = parseInt(document.getElementById('ob-age').value);
+  const gender = document.getElementById('ob-gender').value;
+  const height = parseFloat(document.getElementById('ob-height').value);
+  const weight = parseFloat(document.getElementById('ob-weight').value);
+  const target = parseFloat(document.getElementById('ob-target-weight').value);
+  const weeks = parseInt(document.getElementById('ob-weeks').value);
+  const activity = parseFloat(document.getElementById('ob-activity').value);
+
+  if(!age || !height || !weight || !target || !weeks) {
+    window.showDialog("Missing Information", "Please fill in all fields."); return;
+  }
+
+  // BMR: Mifflin-St Jeor Equation
+  let bmr = (10 * weight) + (6.25 * height) - (5 * age) + (gender === 'male' ? 5 : -161);
+  let tdee = bmr * activity;
+
+  // Weight Loss Math: 1kg body fat = ~7700 kcal
+  let weightToLose = weight - target;
+  let totalDeficit = weightToLose * 7700;
+  let dailyDeficit = totalDeficit / (weeks * 7);
+
+  let dailyCalories = tdee - dailyDeficit;
+  
+  // Safety Caps
+  let floor = (gender === 'female') ? 1200 : 1500;
+  if(dailyCalories < floor) {
+    window.showDialog("Plan Adjusted", `Warning: Your plan required an unsafe deficit. We have capped your daily budget at ${floor} kcal for health reasons. It may take longer than ${weeks} weeks to reach your goal.`);
+    dailyCalories = floor;
+  }
+
+  // Macros: 30% Protein, 30% Fat, 40% Carbs
+  let proteinG = (dailyCalories * 0.30) / 4;
+  let fatG = (dailyCalories * 0.30) / 9;
+  let carbG = (dailyCalories * 0.40) / 4;
+
+  plan = {
+    age, gender, height, weightKg: weight, targetKg: target, weeks, activity,
+    bmr: Math.round(bmr), tdee: Math.round(tdee), dailyCalories: Math.round(dailyCalories),
+    proteinG: Math.round(proteinG), fatG: Math.round(fatG), carbG: Math.round(carbG),
+    startDate: getTodayStr()
+  };
+
+  weightLogs[getTodayStr()] = weight;
+  
+  saveState(STORAGE_KEYS.plan, plan);
+  saveState(STORAGE_KEYS.weight, weightLogs);
+
+  document.getElementById('onboarding').classList.remove('active');
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('tab-bar').style.display = 'flex';
+  
+  initApp();
+  navTo('today');
+}
+
+/* =====================================================================
+   APP INITIALIZATION & NAVIGATION
+   ===================================================================== */
+function initApp() {
+  diary = loadState(STORAGE_KEYS.diary, []);
+  waterLog = loadState(STORAGE_KEYS.water, {});
+  weightLogs = loadState(STORAGE_KEYS.weight, {});
+  if(!waterLog[getTodayStr()]) waterLog[getTodayStr()] = 0;
+}
+
+// Bug fix: previously used the implicit global `event` object to find which
+// tab was clicked. That silently breaks (or throws in strict mode) whenever
+// navTo() is called programmatically, e.g. from generatePlan() or boot().
+// The tab element is now resolved explicitly via a data-screen attribute.
+function navTo(screenId, tabEl) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const targetScreen = document.getElementById('screen-' + screenId);
+  if (targetScreen) targetScreen.classList.add('active');
+
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  const resolvedTab = tabEl || document.querySelector(`.tab-item[data-screen="${screenId}"]`);
+  if (resolvedTab) resolvedTab.classList.add('active');
+
+  if(screenId === 'today') renderToday();
+  if(screenId === 'log') renderDiary();
+  if(screenId === 'water') renderWater();
+  if(screenId === 'progress') renderProgress();
+  if(screenId === 'profile') renderProfile();
+}
+
+/* =====================================================================
+   TODAY SCREEN (LIQUID RINGS & BARS)
+   ===================================================================== */
+function renderToday() {
+  const todayEntries = diary.filter(d => d.date === getTodayStr());
+  
+  let eatenCal = 0, eatenP = 0, eatenF = 0, eatenC = 0;
+  todayEntries.forEach(item => {
+    eatenCal += item.calories; eatenP += item.protein_g; eatenF += item.fat_g; eatenC += item.carbs_g;
+  });
+
+  document.getElementById('cal-eaten').innerText = Math.round(eatenCal);
+  document.getElementById('cal-budget').innerText = plan.dailyCalories;
+  
+  let left = Math.max(0, plan.dailyCalories - eatenCal);
+  document.getElementById('cal-remaining').innerText = Math.round(left);
+
+  // Animate SVG Ring
+  const circle = document.getElementById('cal-ring');
+  const circumference = 502.65; // 2 * pi * 80
+  // Bug fix: guard against divide-by-zero if dailyCalories is ever 0.
+  let percent = plan.dailyCalories > 0 ? Math.min(eatenCal / plan.dailyCalories, 1) : 0;
+  let offset = circumference - (percent * circumference);
+  circle.style.strokeDashoffset = offset;
+  
+  // Ring Color Change if over budget
+  if (eatenCal > plan.dailyCalories) {
+    circle.style.stroke = "var(--accent-orange)";
+  } else {
+    circle.style.stroke = "var(--accent-red)";
+  }
+
+  // Update Macro Bars
+  updateMacroBar('protein', eatenP, plan.proteinG);
+  updateMacroBar('fat', eatenF, plan.fatG);
+  updateMacroBar('carbs', eatenC, plan.carbG);
+}
+
+function updateMacroBar(id, eaten, target) {
+  document.getElementById(`txt-${id}`).innerText = `${Math.round(eaten)} / ${Math.round(target)}g`;
+  // Bug fix: guard against divide-by-zero (NaN width) if a target is ever 0.
+  let pct = target > 0 ? Math.min((eaten / target) * 100, 100) : 0;
+  document.getElementById(`bar-${id}`).style.width = `${pct}%`;
+}
+
+/* =====================================================================
+   FOOD LOGGING SCREEN
+   ===================================================================== */
+function searchFood() {
+  const query = document.getElementById('foodSearch').value.toLowerCase();
+  const resDiv = document.getElementById('searchResults');
+  if (query.length < 2) { resDiv.innerHTML = ''; return; }
+  
+  const hits = foodDatabase.filter(f => f.name.toLowerCase().includes(query)).slice(0, 10);
+  
+  // Bug fix: results were previously wired up with onclick='openFoodModal(${idx})'
+  // built via string interpolation. A custom food name containing a quote
+  // character would break the generated HTML/handler. Using data-idx +
+  // event delegation avoids that entirely.
+  resDiv.innerHTML = hits.map((food, idx) => `
+    <div class="search-result" data-idx="${idx}">
+      <div>
+        <div class="food-name">${escapeHtml(food.name)}</div>
+        <div class="food-meta">${Math.round(food.calories)} kcal | P:${food.protein_g}g F:${food.fat_g}g C:${food.carbs_g}g (per 100g/ml)</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </div>
+  `).join('');
+  
+  // Temporarily store hits for modal access
+  window._currentSearchHits = hits;
+}
+
+document.getElementById('searchResults').addEventListener('click', (e) => {
+  const row = e.target.closest('.search-result');
+  if (!row) return;
+  openFoodModal(parseInt(row.dataset.idx, 10));
+});
+
+function openFoodModal(idx) {
+  selectedFoodForModal = window._currentSearchHits[idx];
+  document.getElementById('modalFoodName').innerText = selectedFoodForModal.name;
+  document.getElementById('modalFoodMeta').innerText = `${selectedFoodForModal.calories} kcal / 100g (or 100ml)`;
+  document.getElementById('modalAmount').value = 100;
+  document.getElementById('modalUnit').value = 'g';
+  updateDynamicPreview();
+  document.getElementById('foodModal').classList.add('active');
+}
+
+function updateDynamicPreview() {
+  if(!selectedFoodForModal) return;
+  let amount = parseFloat(document.getElementById('modalAmount').value) || 0;
+  let mult = amount / 100;
+  let c = Math.round(selectedFoodForModal.calories * mult);
+  let p = (selectedFoodForModal.protein_g * mult).toFixed(1);
+  let f = (selectedFoodForModal.fat_g * mult).toFixed(1);
+  let cb = (selectedFoodForModal.carbs_g * mult).toFixed(1);
+  document.getElementById('modalDynamicPreview').innerText = `${c} kcal | P:${p}g | F:${f}g | C:${cb}g`;
+}
+
+function closeModal() {
+  document.getElementById('foodModal').classList.remove('active');
+}
+
+function saveFoodEntry() {
+  const amount = parseFloat(document.getElementById('modalAmount').value);
+  const unit = document.getElementById('modalUnit').value;
+  const meal = document.getElementById('modalMeal').value;
+  if (!amount || amount <= 0) return;
+
+  const multiplier = amount / 100;
+  const entry = {
+    id: Date.now(),
+    date: getTodayStr(),
+    meal: meal,
+    name: selectedFoodForModal.name,
+    amount: amount,
+    unit: unit,
+    calories: selectedFoodForModal.calories * multiplier,
+    protein_g: selectedFoodForModal.protein_g * multiplier,
+    fat_g: selectedFoodForModal.fat_g * multiplier,
+    carbs_g: selectedFoodForModal.carbs_g * multiplier
+  };
+
+  diary.push(entry);
+  saveState(STORAGE_KEYS.diary, diary);
+  
+  closeModal();
+  document.getElementById('foodSearch').value = '';
+  document.getElementById('searchResults').innerHTML = '';
+  renderDiary();
+  renderToday(); // Update rings instantly
+}
+
+function openCustomFoodModal() {
+  document.getElementById('customFoodModal').classList.add('active');
+}
+
+function closeCustomFoodModal() {
+  document.getElementById('customFoodModal').classList.remove('active');
+}
+
+function saveCustomFood() {
+  const name = document.getElementById('cf-name').value;
+  const cal = parseFloat(document.getElementById('cf-cal').value);
+  const protein = parseFloat(document.getElementById('cf-protein').value) || 0;
+  const fat = parseFloat(document.getElementById('cf-fat').value) || 0;
+  const carbs = parseFloat(document.getElementById('cf-carbs').value) || 0;
+
+  if(!name || isNaN(cal)) { window.showDialog("Missing Data", "Please enter at least a name and calories."); return; }
+
+  const newFood = {
+    name: name + " (Custom)",
+    calories: cal,
+    protein_g: protein,
+    fat_g: fat,
+    carbs_g: carbs,
+    saturated_fat_g: 0, sugars_g: 0, fiber_g: 0, sodium_mg: 0, cholesterol_mg: 0
+  };
+
+  customFoods.push(newFood);
+  saveState(STORAGE_KEYS.customFoods, customFoods);
+  foodDatabase.push(newFood);
+
+  closeCustomFoodModal();
+  
+  // Clear inputs
+  document.getElementById('cf-name').value = '';
+  document.getElementById('cf-cal').value = '';
+  document.getElementById('cf-protein').value = '';
+  document.getElementById('cf-fat').value = '';
+  document.getElementById('cf-carbs').value = '';
+  
+  window.showDialog("Success", `${name} has been added to your database and is now searchable!`);
+}
+
+function renderDiary() {
+  const todayEntries = diary.filter(d => d.date === getTodayStr());
+  const list = document.getElementById('diaryList');
+  
+  if(todayEntries.length === 0) {
+    list.innerHTML = `<p style="text-align:center; padding: 20px;">No foods logged today.</p>`;
+    return;
+  }
+
+  list.innerHTML = todayEntries.map(e => {
+    // Backward compatibility for old logs that used 'grams'
+    const amt = e.amount || e.grams || 0;
+    const un = e.unit || 'g';
+    return `
+      <div class="log-item">
+        <div>
+          <div class="food-name">${escapeHtml(e.name)} <span style="font-weight:400; font-size:14px; color:var(--text-muted);">(${amt}${un})</span></div>
+          <div class="food-meta">${escapeHtml(e.meal)} • ${Math.round(e.calories)} kcal | P:${Math.round(e.protein_g)} F:${Math.round(e.fat_g)} C:${Math.round(e.carbs_g)}</div>
+        </div>
+        <button class="delete-btn" onclick="deleteEntry(${e.id})">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+function deleteEntry(id) {
+  diary = diary.filter(d => d.id !== id);
+  saveState(STORAGE_KEYS.diary, diary);
+  renderDiary();
+  renderToday(); // Update rings instantly
+}
+
+/* =====================================================================
+   WATER TRACKER
+   ===================================================================== */
+function renderWater() {
+  const todayStr = getTodayStr();
+  const currentTotal = waterLog[todayStr] || 0;
+  document.getElementById('water-total').innerHTML = `${currentTotal}<span style="font-size:24px;">ml</span>`;
+
+  const totalGlasses = 8; // 2000ml / 250ml
+  let html = '';
+  
+  for(let i=0; i<totalGlasses; i++) {
+    // Calculate fill percentage for this specific glass
+    let waterAllocatedToThisGlass = Math.max(0, currentTotal - (i * 250));
+    let fillPct = Math.min((waterAllocatedToThisGlass / 250) * 100, 100);
+    
+    html += `
+      <div class="water-glass-btn" onclick="addWater(250)">
+        <div class="water-fill" style="height: ${fillPct}%"></div>
+        <svg class="water-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path>
+        </svg>
+      </div>
+    `;
+  }
+  document.getElementById('waterGrid').innerHTML = html;
+}
+
+function addWater(amount) {
+  const todayStr = getTodayStr();
+  waterLog[todayStr] = Math.max(0, (waterLog[todayStr] || 0) + amount);
+  saveState(STORAGE_KEYS.water, waterLog);
+  renderWater();
+}
+
+/* =====================================================================
+   PROGRESS & CHARTS
+   ===================================================================== */
+function logWeight() {
+  const w = parseFloat(document.getElementById('newWeight').value);
+  if(w) {
+    weightLogs[getTodayStr()] = w;
+    saveState(STORAGE_KEYS.weight, weightLogs);
+    document.getElementById('newWeight').value = '';
+    renderProgress();
+  }
+}
+
+function renderProgress() {
+  const dates = Object.keys(weightLogs).sort();
+  
+  // Populate Goal Tracking UI
+  let currentWt = plan.weightKg;
+  if (dates.length > 0) {
+    currentWt = weightLogs[dates[dates.length-1]];
+  }
+  document.getElementById('trk-current').innerText = currentWt + ' kg';
+  document.getElementById('trk-target').innerText = plan.targetKg + ' kg';
+  
+  // Calculate Days Left
+  const startD = new Date(plan.startDate);
+  const targetD = new Date(startD.getTime() + (plan.weeks * 7 * 24 * 60 * 60 * 1000));
+  const now = new Date();
+  let daysLeft = Math.ceil((targetD - now) / (1000 * 60 * 60 * 24));
+  if (daysLeft < 0) daysLeft = 0; // Prevent negative days if past deadline
+  document.getElementById('trk-days').innerText = daysLeft;
+
+  if(dates.length === 0) return;
+
+  const canvas = document.getElementById('weightChart');
+  const ctx = canvas.getContext('2d');
+  
+  // Handle High DPI displays
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  
+  const w = rect.width;
+  const h = rect.height;
+  
+  ctx.clearRect(0, 0, w, h);
+  
+  const minW = Math.min(...Object.values(weightLogs), plan.targetKg) - 2;
+  const maxW = Math.max(...Object.values(weightLogs), plan.weightKg) + 2;
+  
+  const padX = 20; const padY = 20;
+  const chartW = w - padX * 2;
+  const chartH = h - padY * 2;
+  
+  const mapX = (i) => padX + (i / Math.max(1, dates.length - 1)) * chartW;
+  const mapY = (val) => padY + chartH - ((val - minW) / (maxW - minW)) * chartH;
+
+  // Draw Target Line (Dashed)
+  ctx.beginPath();
+  ctx.setLineDash([5, 5]);
+  ctx.strokeStyle = "rgba(134, 134, 139, 0.5)";
+  ctx.lineWidth = 2;
+  ctx.moveTo(padX, mapY(plan.targetKg));
+  ctx.lineTo(padX + chartW, mapY(plan.targetKg));
+  ctx.stroke();
+  
+  // Draw Weight Line (Smooth Bezier Curve)
+  ctx.beginPath();
+  ctx.setLineDash([]);
+  const styleStr = getComputedStyle(document.body).getPropertyValue('--accent-blue').trim() || '#007aff';
+  ctx.strokeStyle = styleStr;
+  ctx.lineWidth = 4;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  
+  if (dates.length === 1) {
+    ctx.moveTo(mapX(0), mapY(weightLogs[dates[0]]));
+    ctx.lineTo(w/2, mapY(weightLogs[dates[0]]));
+  } else {
+    ctx.moveTo(mapX(0), mapY(weightLogs[dates[0]]));
+    for(let i=0; i<dates.length-1; i++) {
+      let x0 = mapX(i), y0 = mapY(weightLogs[dates[i]]);
+      let x1 = mapX(i+1), y1 = mapY(weightLogs[dates[i+1]]);
+      let xc = (x0 + x1) / 2;
+      let yc = (y0 + y1) / 2;
+      ctx.quadraticCurveTo(x0, y0, xc, yc);
+    }
+    ctx.lineTo(mapX(dates.length-1), mapY(weightLogs[dates[dates.length-1]]));
+  }
+  ctx.stroke();
+
+  // Draw Points
+  ctx.fillStyle = "#fff";
+  for(let i=0; i<dates.length; i++) {
+    ctx.beginPath();
+    let x = dates.length === 1 ? w/2 : mapX(i);
+    ctx.arc(x, mapY(weightLogs[dates[i]]), 5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  
+  // Calculate Weekly Stats (last 7 days)
+  let pastWeekCal = 0;
+  let loggedDays = 0;
+  const todayDateObj = new Date();
+  
+  for(let i=0; i<7; i++) {
+    let d = new Date(todayDateObj);
+    d.setDate(d.getDate() - i);
+    let dStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    let dayEntries = diary.filter(e => e.date === dStr);
+    if(dayEntries.length > 0) {
+      loggedDays++;
+      pastWeekCal += dayEntries.reduce((sum, e) => sum + e.calories, 0);
+    }
+  }
+  
+  let avgC = loggedDays ? Math.round(pastWeekCal / loggedDays) : 0;
+  
+  // Bug fix: use dynamic current TDEE calculation
+  let currentTdee = computePlanTdee();
+  let avgD = loggedDays ? Math.round(currentTdee - avgC) : 0;
+  
+  document.getElementById('avg-cal').innerText = avgC > 0 ? `${avgC} kcal` : '--';
+  document.getElementById('avg-def').innerText = avgD > 0 ? `${avgD} kcal` : '--';
+}
+
+// Fixed bug where activity multiplier was not correctly parsing numeric value in some conditions
+function computePlanTdee() {
+  const datesArr = Object.keys(weightLogs || {}).sort();
+  let currentWt = plan.weightKg;
+  if (datesArr.length > 0) {
+    currentWt = weightLogs[datesArr[datesArr.length-1]];
+  }
+
+  const bmr = plan.gender === 'male'
+    ? (10 * currentWt) + (6.25 * plan.heightCm) - (5 * plan.age) + 5
+    : (10 * currentWt) + (6.25 * plan.heightCm) - (5 * plan.age) - 161;
+  
+  return bmr * (parseFloat(plan.activity) || 1.2);
+}
+
+/* =====================================================================
+   PROFILE & UTILS
+   ===================================================================== */
+function renderProfile() {
+  document.getElementById('profileSummary').innerHTML = `
+    <div class="profile-row"><span>Starting weight</span><span style="font-weight:600;">${plan.weightKg} kg</span></div>
+    <div class="profile-row"><span>Target weight</span><span style="font-weight:600;">${plan.targetKg} kg</span></div>
+    <div class="profile-row"><span>Goal Duration</span><span style="font-weight:600;">${plan.weeks} weeks</span></div>
+    <div class="profile-row"><span>Daily calorie budget</span><span style="font-weight:600; color:var(--accent-blue);">${plan.dailyCalories} kcal</span></div>
+    <div class="profile-row"><span>Protein / Fat / Carbs</span><span style="font-weight:600;">${plan.proteinG}g / ${plan.fatG}g / ${plan.carbG}g</span></div>
+    <div class="profile-row"><span>Activity Multiplier</span><span style="font-weight:600;">${plan.activity}</span></div>
+  `;
+}
+
+function exportData() {
+  const data = {
+    _type: 'balance_backup', _version: 1,
+    exportedAt: new Date().toISOString(),
+    plan, diary, waterLog, weightLogs, customFoods
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `balance_export_${getTodayStr()}.json`;
+  a.click();
+  // Bug fix: the object URL was never revoked, leaking memory over repeated exports.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Shared by both local-file restore and Google Drive restore so the two
+// code paths can't drift out of sync.
+function applyRestoredData(data) {
+  if (!data || typeof data !== 'object') {
+    throw new Error('File does not contain valid backup data.');
+  }
+  if (data.plan) saveState(STORAGE_KEYS.plan, data.plan);
+  if (data.diary) saveState(STORAGE_KEYS.diary, data.diary);
+  if (data.waterLog) saveState(STORAGE_KEYS.water, data.waterLog);
+  if (data.weightLogs) saveState(STORAGE_KEYS.weight, data.weightLogs);
+  if (data.customFoods) saveState(STORAGE_KEYS.customFoods, data.customFoods);
+}
+
+function handleRestoreFile(evt) {
+  const file = evt.target.files && evt.target.files[0];
+  evt.target.value = ''; // allow re-selecting the same file later
+  if (!file) return;
+
+  window.showDialog("Restore from File?", `This will overwrite the data on this device with the contents of "${file.name}". Proceed?`, true, () => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        applyRestoredData(data);
+        window.showDialog("Restore Complete", "Data has been restored from file. The app will now reload.", false, () => location.reload());
+        setTimeout(() => location.reload(), 2500);
+      } catch (e) {
+        console.error("Local restore failed", e);
+        window.showDialog("Restore Failed", "That file could not be read as a valid Balance backup.");
+      }
+    };
+    reader.onerror = () => window.showDialog("Restore Failed", "The file could not be read.");
+    reader.readAsText(file);
+  });
+}
+
+function resetApp() {
+  window.showDialog("Erase All Data?", "This will permanently erase all your tracked data and plans. Are you sure?", true, () => {
+    Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(STORAGE_PREFIX + k));
+    location.reload();
+  });
+}
+
+/* =====================================================================
+   BOOTSTRAP
+   ===================================================================== */
+(async function boot() {
+  await loadFoodDB();
+  
+  plan = loadState(STORAGE_KEYS.plan, null);
+  
+  if(plan) {
+    initApp();
+    document.getElementById('onboarding').classList.remove('active');
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('tab-bar').style.display = 'flex';
+    navTo('today'); // Default screen
+  } else {
+    // Show onboarding by default
+  }
+})();
+</script>
+
+<!-- GOOGLE SIGN-IN + GOOGLE DRIVE CLOUD SYNC MODULE
+     Bug fix: the previous version imported Firebase and relied on
+     __firebase_config / __initial_auth_token / __app_id globals. Those are
+     only injected inside Google's internal "Canvas" tool — anywhere else
+     (a real browser, a real host) firebaseConfig was just `{}`, so
+     initializeApp() failed and Cloud Sync never actually worked, and no
+     Google login was ever presented to the user.
+
+     This replaces that with real "Sign in with Google" (Google Identity
+     Services OAuth) + Google Drive's hidden "App Data" folder as storage.
+     The App Data folder is private to this app and does not show up in the
+     user's regular Drive file list.
+
+     SETUP REQUIRED: you need a free Google OAuth Client ID.
+       1. Go to https://console.cloud.google.com/apis/credentials
+       2. Create an OAuth 2.0 Client ID of type "Web application"
+       3. Add the exact URL(s) you will host this app on to
+          "Authorized JavaScript origins" (e.g. https://yourname.github.io)
+       4. Paste the generated Client ID below. -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com"; // <-- REPLACE THIS
+  const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+  const DRIVE_FILENAME = "balance_backup.json";
+
+  let tokenClient = null;
+  let accessToken = null;
+  let tokenExpiresAt = 0;
+
+  function setCloudStatus(msg) {
+    const el = document.getElementById('cloud-status');
+    if (el) el.innerText = msg;
+  }
+  function showSignedInUI() {
+    document.getElementById('google-signed-out').style.display = 'none';
+    document.getElementById('google-signed-in').style.display = 'block';
+  }
+  function showSignedOutUI() {
+    document.getElementById('google-signed-out').style.display = 'block';
+    document.getElementById('google-signed-in').style.display = 'none';
+  }
+
+  function initGoogleAuth() {
+    if (GOOGLE_CLIENT_ID.startsWith("YOUR_")) {
+      setCloudStatus("Google Sync isn't configured yet — add your OAuth Client ID (see comment in the code / README).");
+      return;
+    }
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: (resp) => {
+        if (resp.error) { setCloudStatus("Sign-in failed: " + resp.error); return; }
+        accessToken = resp.access_token;
+        tokenExpiresAt = Date.now() + (resp.expires_in * 1000);
+        showSignedInUI();
+        setCloudStatus("Signed in with Google.");
+      }
+    });
+
+    const btnHost = document.getElementById('gis-signin-btn');
+    btnHost.innerHTML = '';
+    const signInButton = document.createElement('button');
+    signInButton.type = 'button';
+    signInButton.textContent = "Sign in with Google";
+    signInButton.style.width = 'auto';
+    signInButton.style.padding = '12px 28px';
+    signInButton.onclick = () => tokenClient.requestAccessToken({ prompt: 'consent' });
+    btnHost.appendChild(signInButton);
+    setCloudStatus("Not signed in.");
+  }
+
+  window.googleSignOut = function() {
+    if (accessToken && google.accounts?.oauth2?.revoke) {
+      google.accounts.oauth2.revoke(accessToken, () => {});
+    }
+    accessToken = null;
+    tokenExpiresAt = 0;
+    showSignedOutUI();
+    setCloudStatus("Signed out.");
+  };
+
+  // Silently refreshes the access token via the token client when expired,
+  // without forcing the user to click "Sign in" again mid-session.
+  function ensureAccessToken() {
+    if (accessToken && Date.now() < tokenExpiresAt - 60000) return Promise.resolve(accessToken);
+    return new Promise((resolve, reject) => {
+      if (!tokenClient) { reject(new Error("Google sign-in isn't set up.")); return; }
+      tokenClient.callback = (resp) => {
+        if (resp.error) { reject(new Error(resp.error)); return; }
+        accessToken = resp.access_token;
+        tokenExpiresAt = Date.now() + (resp.expires_in * 1000);
+        resolve(accessToken);
+      };
+      tokenClient.requestAccessToken({ prompt: '' });
+    });
+  }
+
+  async function findDriveBackupFileId(token) {
+    const q = encodeURIComponent(`name='${DRIVE_FILENAME}'`);
+    const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,name,modifiedTime)`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`Drive list failed (${res.status})`);
+    const json = await res.json();
+    return (json.files && json.files[0]) ? json.files[0] : null;
+  }
+
+  window.backupData = async function() {
+    setCloudStatus("Backing up to Google Drive...");
+    try {
+      const token = await ensureAccessToken();
+      const existing = await findDriveBackupFileId(token);
+
+      const payload = {
+        _type: 'balance_backup', _version: 1,
+        exportedAt: new Date().toISOString(),
+        plan: loadState(STORAGE_KEYS.plan, null),
+        diary: loadState(STORAGE_KEYS.diary, []),
+        waterLog: loadState(STORAGE_KEYS.water, {}),
+        weightLogs: loadState(STORAGE_KEYS.weight, {}),
+        customFoods: loadState(STORAGE_KEYS.customFoods, [])
+      };
+
+      const metadata = { name: DRIVE_FILENAME, mimeType: 'application/json' };
+      if (!existing) metadata.parents = ['appDataFolder'];
+
+      const boundary = '-------balanceapp' + Date.now();
+      const body =
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(payload)}\r\n` +
+        `--${boundary}--`;
+
+      const uploadUrl = existing
+        ? `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=multipart`
+        : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+
+      const res = await fetch(uploadUrl, {
+        method: existing ? 'PATCH' : 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body
+      });
+      if (!res.ok) throw new Error(`Drive upload failed (${res.status})`);
+
+      setCloudStatus(`Last backup: ${new Date().toLocaleTimeString()}`);
+      window.showDialog("Backup Successful", "Your data was backed up to your Google Drive App Data folder.");
+    } catch (e) {
+      console.error("Backup failed", e);
+      setCloudStatus("Backup failed.");
+      window.showDialog("Backup Error", "There was an error backing up to Google Drive: " + e.message);
+    }
+  };
+
+  window.restoreData = async function() {
+    window.showDialog("Restore from Drive?", "This will overwrite your current device data with your Google Drive backup. Proceed?", true, async () => {
+      setCloudStatus("Restoring from Google Drive...");
+      try {
+        const token = await ensureAccessToken();
+        const existing = await findDriveBackupFileId(token);
+        if (!existing) {
+          setCloudStatus("No backup found.");
+          window.showDialog("No Backup Found", "There is no backup file in your Google Drive App Data folder yet.");
+          return;
+        }
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${existing.id}?alt=media`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(`Drive download failed (${res.status})`);
+        const data = await res.json();
+        applyRestoredData(data);
+        window.showDialog("Restore Complete", "Data has been restored from Google Drive! The app will now reload.", false, () => location.reload());
+        setTimeout(() => location.reload(), 2500);
+      } catch (e) {
+        console.error("Restore failed", e);
+        setCloudStatus("Restore failed.");
+        window.showDialog("Restore Error", "There was an error restoring from Google Drive: " + e.message);
+      }
+    });
+  };
+
+  // The GIS script tag loads async, so poll briefly until it's ready
+  // instead of assuming it's present by the time this script runs.
+  window.addEventListener('load', () => {
+    let tries = 0;
+    const iv = setInterval(() => {
+      tries++;
+      if (window.google?.accounts?.oauth2) {
+        clearInterval(iv);
+        initGoogleAuth();
+      } else if (tries > 40) { // ~10s
+        clearInterval(iv);
+        setCloudStatus("Google sign-in unavailable (script blocked or offline).");
+      }
+    }, 250);
+  });
+
+  // ---- PWA: register the service worker so the app is installable ----
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => {
+        console.log('Service worker registration failed (app still works, just without offline caching / install prompt):', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
