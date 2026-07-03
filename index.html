@@ -149,7 +149,6 @@
     }
     button.danger { background: var(--accent-red); box-shadow: 0 4px 14px 0 rgba(255, 59, 48, 0.39); }
 
-    /* Onboarding Grid */
     .input-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -231,7 +230,6 @@
     .modal-overlay.active { display: flex; opacity: 1; }
     .modal { width: 90%; max-width: 400px; margin-bottom: 0; }
 
-    /* Cloud Status */
     .cloud-status {
       font-size: 12px; color: var(--text-muted); margin-top: 8px; text-align: center;
     }
@@ -487,7 +485,7 @@
     </div>
   </div>
 
-  <!-- NEW HEALTH SCREEN -->
+  <!-- HEALTH SCREEN -->
   <div id="screen-health" class="screen">
     <div class="glass-card">
       <h2>Health Status</h2>
@@ -501,7 +499,7 @@
   </div>
 
   <div id="screen-profile" class="screen">
-    <!-- NEW TARGET GOAL UPDATE -->
+    <!-- TARGET GOAL UPDATE -->
     <div class="glass-card">
       <h2>Update Target Goal</h2>
       <p style="font-size: 13px;">Modify your goal based on your current weight.</p>
@@ -575,7 +573,7 @@
     <svg><path d="M3 3v18h18M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
     <span>Progress</span>
   </div>
-  <!-- NEW HEALTH TAB -->
+  <!-- HEALTH TAB -->
   <div class="tab-item" data-screen="health" onclick="navTo('health', this)">
     <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
     <span>Health</span>
@@ -743,7 +741,7 @@ function saveState(key, val) {
 }
 
 /* =====================================================================
-   ONBOARDING & PLAN GENERATION
+   ONBOARDING & PLAN GENERATION (Clinical Rules applied)
    ===================================================================== */
 function generatePlan() {
   const age = parseInt(document.getElementById('ob-age').value);
@@ -758,24 +756,59 @@ function generatePlan() {
     window.showDialog("Missing Information", "Please fill in all fields."); return;
   }
 
+  // BMR: Mifflin-St Jeor Equation (Most accurate clinical standard)
   let bmr = (10 * weight) + (6.25 * height) - (5 * age) + (gender === 'male' ? 5 : -161);
   let tdee = bmr * activity;
 
-  let weightToLose = weight - target;
-  let totalDeficit = weightToLose * 7700;
-  let dailyDeficit = totalDeficit / (weeks * 7);
-
-  let dailyCalories = tdee - dailyDeficit;
+  // Weight Math: 1kg body weight change = ~7700 kcal
+  let weightDiff = weight - target; 
+  let dailyCalories = tdee;
   
+  // Safety Caps based on WHO & Clinical Guidelines
   let floor = (gender === 'female') ? 1200 : 1500;
-  if(dailyCalories < floor) {
-    window.showDialog("Plan Adjusted", `Warning: Your plan required an unsafe deficit. We have capped your daily budget at ${floor} kcal for health reasons. It may take longer than ${weeks} weeks to reach your goal.`);
-    dailyCalories = floor;
+  let warningMsg = "";
+
+  if (weightDiff > 0) { // Goal: Weight Loss
+    let totalDeficit = weightDiff * 7700;
+    let dailyDeficit = totalDeficit / (weeks * 7);
+    
+    // Max safe weight loss is ~1kg per week (1000 kcal deficit/day)
+    if (dailyDeficit > 1000) {
+      dailyDeficit = 1000;
+      warningMsg += "A safe weight loss rate is max 1 kg/week. Deficit capped at 1000 kcal/day. ";
+    }
+    
+    dailyCalories = tdee - dailyDeficit;
+    
+    // Absolute minimum healthy caloric floor
+    if(dailyCalories < floor) {
+      dailyCalories = floor;
+      warningMsg += `To ensure adequate nutrition, your budget is capped at a minimum of ${floor} kcal/day. `;
+    }
+  } else if (weightDiff < 0) { // Goal: Weight Gain
+    let totalSurplus = Math.abs(weightDiff) * 7700;
+    let dailySurplus = totalSurplus / (weeks * 7);
+    
+    // Max safe weight gain is ~0.5kg per week (500 kcal surplus/day)
+    if (dailySurplus > 500) {
+      dailySurplus = 500;
+      warningMsg += "A safe weight gain rate is max 0.5 kg/week. Surplus capped at 500 kcal/day. ";
+    }
+    
+    dailyCalories = tdee + dailySurplus;
+  } else {
+    // Maintenance
+    dailyCalories = tdee;
   }
 
-  let proteinG = (dailyCalories * 0.30) / 4;
-  let fatG = (dailyCalories * 0.30) / 9;
-  let carbG = (dailyCalories * 0.40) / 4;
+  if (warningMsg !== "") {
+    window.showDialog("Plan Adjusted for Health", warningMsg + `It will likely take a different amount of time than ${weeks} weeks to reach your goal safely.`);
+  }
+
+  // AMDR Macros: 50% Carbs, 25% Protein, 25% Fat
+  let carbG = (dailyCalories * 0.50) / 4;
+  let proteinG = (dailyCalories * 0.25) / 4;
+  let fatG = (dailyCalories * 0.25) / 9;
 
   plan = {
     age, gender, height, weightKg: weight, targetKg: target, weeks, activity,
@@ -1067,7 +1100,6 @@ function logWeight() {
     document.getElementById('newWeight').value = '';
     renderProgress();
     
-    // Automatically recalculate TDEE if active plan relies on dynamic weight
     if(document.getElementById('screen-health').classList.contains('active')) {
       renderHealth();
     }
@@ -1206,25 +1238,26 @@ function renderHealth() {
   }
 
   const heightM = plan.height / 100;
-  const bmi = (currentWt / (heightM * heightM)).toFixed(1);
+  const bmi = parseFloat((currentWt / (heightM * heightM)).toFixed(1));
 
   let bmiCategory = "";
   let bmiColor = "";
   let exercise = "";
 
+  // Strict BMI category logic covering floating point edges properly
   if (bmi < 18.5) {
     bmiCategory = "Underweight"; bmiColor = "var(--accent-orange)";
     exercise = "Focus on strength training (hypertrophy) and a caloric surplus to build muscle mass safely.";
-  } else if (bmi >= 18.5 && bmi <= 24.9) {
+  } else if (bmi < 25) { // Covers 18.5 to 24.9
     bmiCategory = "Normal weight"; bmiColor = "var(--accent-green)";
     exercise = "Maintain balance with a mix of cardiovascular exercise (e.g., jogging, swimming) 3 days/week and resistance training 2 days/week.";
-  } else if (bmi >= 25 && bmi <= 29.9) {
+  } else if (bmi < 30) { // Covers 25.0 to 29.9
     bmiCategory = "Overweight"; bmiColor = "var(--accent-orange)";
     exercise = "Moderate-intensity cardio (brisk walking, cycling) for 150 mins/week + strength training to boost metabolism.";
-  } else if (bmi >= 30 && bmi <= 34.9) {
+  } else if (bmi < 35) { // Covers 30.0 to 34.9
     bmiCategory = "Obese (Class I)"; bmiColor = "var(--accent-red)";
     exercise = "Low-impact cardio (swimming, elliptical, walking) to protect joints. Gradually increase duration before intensity.";
-  } else if (bmi >= 35 && bmi <= 39.9) {
+  } else if (bmi < 40) { // Covers 35.0 to 39.9
     bmiCategory = "Obese (Class II)"; bmiColor = "var(--accent-red)";
     exercise = "Prioritize diet. Begin with light walking, water aerobics, or seated exercises to build stamina without joint stress.";
   } else {
@@ -1270,7 +1303,6 @@ function updateTargetGoal() {
     return;
   }
 
-  // Use current weight for correct calculation
   const datesArr = Object.keys(weightLogs || {}).sort();
   let currentWt = plan.weightKg;
   if (datesArr.length > 0) {
@@ -1280,23 +1312,43 @@ function updateTargetGoal() {
   let bmr = (10 * currentWt) + (6.25 * plan.height) - (5 * plan.age) + (plan.gender === 'male' ? 5 : -161);
   let tdee = bmr * plan.activity;
 
-  let weightToLose = currentWt - target;
-  let totalDeficit = weightToLose * 7700;
-  let dailyDeficit = totalDeficit / (weeks * 7);
-
-  let dailyCalories = tdee - dailyDeficit;
+  let weightDiff = currentWt - target;
+  let dailyCalories = tdee;
   
   let floor = (plan.gender === 'female') ? 1200 : 1500;
-  let showWarning = false;
+  let warningMsg = "";
 
-  if(dailyCalories < floor) {
-    showWarning = true;
-    dailyCalories = floor;
+  if (weightDiff > 0) { 
+    let totalDeficit = weightDiff * 7700;
+    let dailyDeficit = totalDeficit / (weeks * 7);
+    
+    if (dailyDeficit > 1000) {
+      dailyDeficit = 1000;
+      warningMsg += "A safe weight loss rate is max 1 kg/week. Deficit capped at 1000 kcal/day. ";
+    }
+    
+    dailyCalories = tdee - dailyDeficit;
+    
+    if(dailyCalories < floor) {
+      dailyCalories = floor;
+      warningMsg += `To ensure adequate nutrition, your budget is capped at a minimum of ${floor} kcal/day. `;
+    }
+  } else if (weightDiff < 0) { 
+    let totalSurplus = Math.abs(weightDiff) * 7700;
+    let dailySurplus = totalSurplus / (weeks * 7);
+    
+    if (dailySurplus > 500) {
+      dailySurplus = 500;
+      warningMsg += "A safe weight gain rate is max 0.5 kg/week. Surplus capped at 500 kcal/day. ";
+    }
+    
+    dailyCalories = tdee + dailySurplus;
   }
 
-  let proteinG = (dailyCalories * 0.30) / 4;
-  let fatG = (dailyCalories * 0.30) / 9;
-  let carbG = (dailyCalories * 0.40) / 4;
+  // AMDR Macros: 50% Carbs, 25% Protein, 25% Fat
+  let carbG = (dailyCalories * 0.50) / 4;
+  let proteinG = (dailyCalories * 0.25) / 4;
+  let fatG = (dailyCalories * 0.25) / 9;
 
   plan.targetKg = target;
   plan.weeks = weeks;
@@ -1304,13 +1356,15 @@ function updateTargetGoal() {
   plan.proteinG = Math.round(proteinG);
   plan.fatG = Math.round(fatG);
   plan.carbG = Math.round(carbG);
-  plan.startDate = getTodayStr(); // Reset the start date for the updated timeline
+  plan.startDate = getTodayStr(); 
 
   saveState(STORAGE_KEYS.plan, plan);
   renderProfile();
 
   let msg = "Your metabolic plan and macros have been updated based on your current weight.";
-  if(showWarning) msg += `\n\nWarning: The required deficit was too large. Your daily calories were capped at ${floor} kcal to keep it safe.`;
+  if (warningMsg !== "") {
+    msg += `\n\nHealth Notice: ${warningMsg} It will likely take a different amount of time than ${weeks} weeks to reach your goal safely.`;
+  }
 
   window.showDialog("Goal Updated", msg);
 }
