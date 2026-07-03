@@ -1322,8 +1322,16 @@ function resetApp() {
   const DRIVE_FILENAME = "balance_backup.json";
 
   let tokenClient = null;
-  let accessToken = null;
-  let tokenExpiresAt = 0;
+  let accessToken = localStorage.getItem('google_access_token') || null;
+  let tokenExpiresAt = parseInt(localStorage.getItem('google_token_expires_at')) || 0;
+
+  // Helper function to check if we have a saved, valid session
+  function checkExistingAuth() {
+    if (accessToken && Date.now() < tokenExpiresAt - 60000) {
+      showSignedInUI();
+      setCloudStatus("Signed in with Google (Session Restored).");
+    }
+  }
 
   function setCloudStatus(msg) {
     const el = document.getElementById('cloud-status');
@@ -1338,7 +1346,7 @@ function resetApp() {
     document.getElementById('google-signed-in').style.display = 'none';
   }
 
-  function initGoogleAuth() {
+ function initGoogleAuth() {
     if (GOOGLE_CLIENT_ID.startsWith("YOUR_")) {
       setCloudStatus("Google Sync isn't configured yet — add your OAuth Client ID (see comment in the code / README).");
       return;
@@ -1350,6 +1358,11 @@ function resetApp() {
         if (resp.error) { setCloudStatus("Sign-in failed: " + resp.error); return; }
         accessToken = resp.access_token;
         tokenExpiresAt = Date.now() + (resp.expires_in * 1000);
+        
+        // SAVE TO LOCAL STORAGE
+        localStorage.setItem('google_access_token', accessToken);
+        localStorage.setItem('google_token_expires_at', tokenExpiresAt.toString());
+
         showSignedInUI();
         setCloudStatus("Signed in with Google.");
       }
@@ -1365,17 +1378,46 @@ function resetApp() {
     signInButton.onclick = () => tokenClient.requestAccessToken({ prompt: 'consent' });
     btnHost.appendChild(signInButton);
     setCloudStatus("Not signed in.");
-  }
 
-  window.googleSignOut = function() {
-    if (accessToken && google.accounts?.oauth2?.revoke) {
-      google.accounts.oauth2.revoke(accessToken, () => {});
+    // CHECK FOR SAVED SESSION ON LOAD
+    checkExistingAuth();
+  }
+function initGoogleAuth() {
+    if (GOOGLE_CLIENT_ID.startsWith("YOUR_")) {
+      setCloudStatus("Google Sync isn't configured yet — add your OAuth Client ID (see comment in the code / README).");
+      return;
     }
-    accessToken = null;
-    tokenExpiresAt = 0;
-    showSignedOutUI();
-    setCloudStatus("Signed out.");
-  };
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: (resp) => {
+        if (resp.error) { setCloudStatus("Sign-in failed: " + resp.error); return; }
+        accessToken = resp.access_token;
+        tokenExpiresAt = Date.now() + (resp.expires_in * 1000);
+        
+        // SAVE TO LOCAL STORAGE
+        localStorage.setItem('google_access_token', accessToken);
+        localStorage.setItem('google_token_expires_at', tokenExpiresAt.toString());
+
+        showSignedInUI();
+        setCloudStatus("Signed in with Google.");
+      }
+    });
+
+    const btnHost = document.getElementById('gis-signin-btn');
+    btnHost.innerHTML = '';
+    const signInButton = document.createElement('button');
+    signInButton.type = 'button';
+    signInButton.textContent = "Sign in with Google";
+    signInButton.style.width = 'auto';
+    signInButton.style.padding = '12px 28px';
+    signInButton.onclick = () => tokenClient.requestAccessToken({ prompt: 'consent' });
+    btnHost.appendChild(signInButton);
+    setCloudStatus("Not signed in.");
+
+    // CHECK FOR SAVED SESSION ON LOAD
+    checkExistingAuth();
+  }
 
   // Silently refreshes the access token via the token client when expired,
   // without forcing the user to click "Sign in" again mid-session.
