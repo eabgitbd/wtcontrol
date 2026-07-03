@@ -4,7 +4,7 @@
   "description": "A simple diet, water and weight tracker with Google Drive backup.",
   "start_url": "./index.html",
   "scope": "./",
-  "display": "standalone",
+  "display": "minimal-ui",
   "orientation": "portrait",
   "background_color": "#ebedee",
   "theme_color": "#007aff",
