@@ -110,6 +110,7 @@ delaySlider.addEventListener('input', (e) => {
 
 function drawVisualizer() {
     if (!isRunning) return;
+if (!isRunning) isRunning = true; 
     requestAnimationFrame(drawVisualizer);
 
     // Setup Canvas
