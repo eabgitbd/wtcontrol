@@ -648,5 +648,13 @@ function animateOverlay(el,anim,isIn,cb){
   anim2.onfinish=()=>{if(cb)cb()};
 }
 </script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW error:', err));
+  });
+}
+</script>
 </body>
 </html>
